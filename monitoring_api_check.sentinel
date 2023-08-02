@@ -1,0 +1,8 @@
+import "tfplan/v2" as tfplan
+
+main = rule {
+    all tfplan.resources.google_project_service as _, instances {
+        instances.change.after is not null and
+        instances.change.after.service is "monitoring.googleapis.com"
+    }
+}
