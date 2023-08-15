@@ -1,8 +1,39 @@
 import "tfplan/v2" as tfplan
 
-main = rule {
-    all tfplan.resources.google_project_service as _, instances {
-        instances.change.after is not null and
-        instances.change.after.service is "monitoring.googleapis.com"
+is_project_being_created = rule {
+    any tfplan.resource_changes as _, r {
+        r.type is "google_project" and
+        r.change.actions contains "create"
     }
+}
+
+is_monitoring_service_enabled = rule when is_project_being_created {
+    any tfplan.resource_changes as _, r {
+        r.type is "google_project_service" and
+        r.change.actions contains "create" and
+        r.change.after.service is "monitoring.googleapis.com"
+    }
+}
+
+is_compute_service_enabled = rule when is_project_being_created {
+    any tfplan.resource_changes as _, r {
+        r.type is "google_project_service" and
+        r.change.actions contains "create" and
+        r.change.after.service is "compute.googleapis.com"
+    }
+}
+
+is_cloudresourcemanager_service_enabled = rule when is_project_being_created {
+    any tfplan.resource_changes as _, r {
+        r.type is "google_project_service" and
+        r.change.actions contains "create" and
+        r.change.after.service is "cloudresourcemanager.googleapis.com"
+    }
+}
+
+main = rule {
+    is_project_being_created and
+    is_monitoring_service_enabled and
+    is_compute_service_enabled and
+    is_cloudresourcemanager_service_enabled
 }
