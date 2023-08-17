@@ -7,7 +7,7 @@ is_project_being_created = rule {
     }
 }
 
-is_monitoring_service_enabled = rule when is_project_being_created {
+is_monitoring_service_enabled = rule {
     any tfplan.resource_changes as _, r {
         r.type is "google_project_service" and
         r.change.actions contains "create" and
@@ -15,15 +15,15 @@ is_monitoring_service_enabled = rule when is_project_being_created {
     }
 }
 
-is_compute_service_enabled = rule when is_project_being_created {
+is_storage_service_enabled = rule {
     any tfplan.resource_changes as _, r {
         r.type is "google_project_service" and
         r.change.actions contains "create" and
-        r.change.after.service is "compute.googleapis.com"
+        r.change.after.service is "storage.googleapis.com"
     }
 }
 
-is_cloudresourcemanager_service_enabled = rule when is_project_being_created {
+is_cloudresourcemanager_service_enabled = rule {
     any tfplan.resource_changes as _, r {
         r.type is "google_project_service" and
         r.change.actions contains "create" and
@@ -32,8 +32,5 @@ is_cloudresourcemanager_service_enabled = rule when is_project_being_created {
 }
 
 main = rule {
-    is_project_being_created and
-    is_monitoring_service_enabled and
-    is_compute_service_enabled and
-    is_cloudresourcemanager_service_enabled
+    not is_project_being_created or (is_monitoring_service_enabled and is_storage_service_enabled and is_cloudresourcemanager_service_enabled)
 }
