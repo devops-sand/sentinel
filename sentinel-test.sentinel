@@ -3,18 +3,22 @@ import "tfplan/v2" as tfplan
 // Function to check if required APIs are enabled for projects being created
 func are_required_apis_created_for_new_project() {
     for tfplan.resource_changes as resource, details {
+        //if details.type is "google_project_service" and details.change.before == null {
+        //    return true
+        //} 
+        
         if details.type is "google_project" and details.change.actions contains "create" {
             project_name = details.change.after.name
-            
+
             // Check for storage API
             is_storage_api_created = false
             for tfplan.resource_changes as service_resource, service_details {
-                if service_details.type is "google_project_service" and service_details.change.actions contains "create" and service_details.change.after.service contains "storage.googleapis.com" and service_details.change.after.project == project_name {
+                if service_details.type is "google_project_service" and service_details.change.actions contains "create" and service_details.change.after.service contains "storage.googleapis.com" and (service_details.change.after.project == project_name or service_details.change.before == null) {
                     is_storage_api_created = true
                     break
                 }
             }
-            
+
             if !is_storage_api_created {
                 return false
             }
@@ -22,12 +26,12 @@ func are_required_apis_created_for_new_project() {
             // Check for monitoring API
             is_monitoring_api_created = false
             for tfplan.resource_changes as service_resource, service_details {
-                if service_details.type is "google_project_service" and service_details.change.actions contains "create" and service_details.change.after.service contains "monitoring.googleapis.com" and service_details.change.after.project == project_name {
+                if service_details.type is "google_project_service" and service_details.change.actions contains "create" and service_details.change.after.service contains "monitoring.googleapis.com" and (service_details.change.after.project == project_name or service_details.change.before == null) {
                     is_monitoring_api_created = true
                     break
                 }
             }
-            
+
             if !is_monitoring_api_created {
                 return false
             }
@@ -39,19 +43,22 @@ func are_required_apis_created_for_new_project() {
 // Function to check if any required APIs are disabled for projects being updated
 func are_required_apis_not_disabled_for_updated_project() {
     for tfplan.resource_changes as resource, details {
-        // Check if a project is being updated
-        if details.type is "google_project" and ((details.change.actions contains "no-op") or (details.change.actions contains "update")) {
+        //if details.type is "google_project_service" and details.change.before == null {
+        //    return true
+        //}
+
+        if details.type is "google_project" and (details.change.actions contains "no-op" or details.change.actions contains "update") {
             project_name = details.change.after.name
-            
+
             // Check if storage API is being disabled
             is_storage_api_disabled = false
             for tfplan.resource_changes as service_resource, service_details {
-                if service_details.type is "google_project_service" and service_details.change.actions contains "delete" and service_details.change.before.service contains "storage.googleapis.com" and service_details.change.before.project == project_name {
+                if service_details.type is "google_project_service" and service_details.change.actions contains "delete" and service_details.change.before.service contains "storage.googleapis.com" and (service_details.change.before.project == project_name or service_details.change.before == null) {
                     is_storage_api_disabled = true
                     break
                 }
             }
-            
+
             if is_storage_api_disabled {
                 return false
             }
@@ -59,12 +66,12 @@ func are_required_apis_not_disabled_for_updated_project() {
             // Check if monitoring API is being disabled
             is_monitoring_api_disabled = false
             for tfplan.resource_changes as service_resource, service_details {
-                if service_details.type is "google_project_service" and service_details.change.actions contains "delete" and service_details.change.before.service contains "monitoring.googleapis.com" and service_details.change.before.project == project_name {
+                if service_details.type is "google_project_service" and service_details.change.actions contains "delete" and service_details.change.before.service contains "monitoring.googleapis.com" and (service_details.change.before.project == project_name or service_details.change.before == null) {
                     is_monitoring_api_disabled = true
                     break
                 }
             }
-            
+
             if is_monitoring_api_disabled {
                 return false
             }
@@ -72,6 +79,7 @@ func are_required_apis_not_disabled_for_updated_project() {
     }
     return true
 }
+
 
 // Main rules
 new_project_apis_check = rule {
@@ -83,5 +91,5 @@ updated_project_apis_check = rule {
 }
 
 main = rule {
-    new_project_apis_check and updated_project_apis_check
+    new_project_apis_check and updated_project_apis_check 
 }
