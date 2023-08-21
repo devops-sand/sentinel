@@ -80,6 +80,36 @@ func are_required_apis_not_disabled_for_updated_project() {
     return true
 }
 
+is_project_being_recreated = rule {
+    any tfplan.resource_changes as _, r {
+        r.type is "google_project" and
+        r.change.actions == ["delete", "create"] 
+    }
+}
+
+projects_being_recreated_count = length(filter tfplan.resource_changes as _, r {
+    r.type is "google_project" and
+    r.change.actions == ["delete", "create"] 
+})
+
+monitoring_api_count = length(filter tfplan.resource_changes as _, r {
+    r.type is "google_project_service" and
+    r.change.actions == ["delete", "create"]  and
+    r.change.after.service is "monitoring.googleapis.com"
+})
+
+storage_api_count = length(filter tfplan.resource_changes as _, r {
+    r.type is "google_project_service" and
+    r.change.actions == ["delete", "create"]  and
+    r.change.after.service is "storage.googleapis.com"
+})
+
+
+is_project_count_eq_api = rule {
+    projects_being_recreated_count <= monitoring_api_count and
+    projects_being_recreated_count <= storage_api_count
+}
+
 
 // Main rules
 new_project_apis_check = rule {
@@ -91,5 +121,5 @@ updated_project_apis_check = rule {
 }
 
 main = rule {
-    new_project_apis_check and updated_project_apis_check 
+    new_project_apis_check and updated_project_apis_check or (is_project_being_recreated and is_project_count_eq_api)
 }
