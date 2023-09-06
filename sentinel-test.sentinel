@@ -2,174 +2,79 @@ import "tfplan/v2" as tfplan
 
 required_apis = ["storage.googleapis.com", "monitoring.googleapis.com"]
 
-
-func is_resource_changed() {
+# Count the number of projects being created
+func count_projects_being_created() {
+    count = 0
     for tfplan.resource_changes as _, details {
-        if details.type is "google_project_service" and 
-           (details.change.actions contains "create" or 
-            details.change.actions contains "delete" or 
-            details.change.actions contains "update" or
-            details.change.actions == ["delete", "create"]) {
-                return true
-        }
-        if details.type is "google_project" and 
-           (details.change.actions contains "create" or 
-            details.change.actions contains "delete" or 
-            details.change.actions contains "update" or
-            details.change.actions == ["delete", "create"]) {
-                return true
-        }
-
-    }
-    return false
-}
-
-
-func is_api_created_for_module(api, module_addr) {
-    for tfplan.resource_changes as service_resource, service_details {
-        if service_details.type is "google_project_service" and
-            service_details.change.actions contains "create" and
-            service_details.change.after.service contains api and
-            service_details.module_address == module_addr {
-                return true
+        if details.type is "google_project" and details.change.actions contains "create" {
+            count += 1
         }
     }
-    return false
+    return count
 }
 
-func is_api_deleted_for_module(api, module_addr) {
-    for tfplan.resource_changes as service_resource, service_details {
-        if service_details.type is "google_project_service" and
-            (service_details.change.actions contains "delete") and
-            service_details.change.before.service contains api and
-            service_details.module_address == module_addr {
-               return true
-            }
-    }
-    return false
-}
-
-func is_api_created_for_project(api, project_name) {
-    for tfplan.resource_changes as service_resource, service_details {
-        if service_details.type is "google_project_service" and
-           service_details.change.actions contains "create" and
-           service_details.change.after.service contains api and
-           (service_details.change.after.project == project_name) {
-            return true
-        }
-    }
-    return false
-}
-
-func is_api_deleted_for_project(api, project_name) {
-    for tfplan.resource_changes as service_resource, service_details {
-        if service_details.type is "google_project_service" and
-           service_details.change.actions contains "delete" and
-           service_details.change.before.service contains api and
-           (service_details.change.before.project == project_name) {
-            return true
-        }
-    }
-    return false
-}
-
-func is_module_address_equal_create() {
-    project_module_address = ""
-    project_name = ""
-
+# Count the number of times a specific API is being enabled
+func count_api_being_enabled(api) {
+    count = 0
     for tfplan.resource_changes as _, details {
-        // Check if the resource is a google_project and is being created
-        if details.type is "google_project" and (details.change.actions contains "create") {
-            project_module_address = details.module_address
-            project_name = details.change.after.name 
-            for required_apis as api {
-                if project_module_address != "" and is_api_created_for_module(api, project_module_address) {
-                    return true
-                }
-                if project_module_address != "" and !is_api_created_for_module(api, project_module_address) {
-                    return false
-                }
-                if project_module_address == "" and is_api_created_for_project(api, project_name) {
-                    return true
-                }
-                if project_module_address == "" and !is_api_created_for_project(api, project_name) {
-                    return false
-                }
-            }
+        if details.type is "google_project_service" and details.change.actions contains "create" and details.change.after.service == api {
+            count += 1
         }
-        
     }
-    return false
+    return count
+}
+
+# Ensure that the number of each required API is equal to or greater than the number of projects being created
+func are_required_apis_enabled_for_all_projects() {
+    project_count = count_projects_being_created()
+    for required_apis as api {
+        if count_api_being_enabled(api) < project_count {
+            return false
+        }
+    }
+    return true
 }
 
 
 
-
-
-// is deleted project module address equal to module address of API that is deleted 
-func is_module_address_equal_delete() {
-    project_module_address = ""
-    project_name = ""
-
+# Count the number of projects being deleted
+func count_projects_being_deleted() {
+    count = 0
     for tfplan.resource_changes as _, details {
-        // Check if the resource is a google_project and is being deleted
         if details.type is "google_project" and details.change.actions contains "delete" {
-            project_module_address = details.module_address
-            project_name = details.change.before.name 
-            for required_apis as api {
-                if project_module_address != "" and is_api_deleted_for_module(api, project_module_address) {
-                    return true
-                }
-                if project_module_address == "" and is_api_deleted_for_project(api, project_name) {
-                    return true
-                }       
-            }
+            count += 1
         }
-        
     }
-    return false
+    return count
 }
 
-
-
-// module update and api enable 
-func is_module_api_update_or_no_chg() {
-    project_module_address = ""
-    project_name = ""
-
+# Count the number of times a specific API is being disabled
+func count_api_being_disabled(api) {
+    count = 0
     for tfplan.resource_changes as _, details {
-        // Check if the resource is a google_project and is being deleted
-        if details.type is "google_project" and details.change.actions contains "no-op" {
-            project_module_address = details.module_address
-            project_name = details.change.after.name 
-            for required_apis as api {
-                if project_module_address != "" and is_api_created_for_module(api, project_module_address) {
-                    return true
-                }
-                if project_module_address != "" and is_api_deleted_for_module(api, project_module_address) {
-                    return false
-                }  
-                if project_module_address == "" and is_api_created_for_project(api, project_name) {
-                    return true
-                }
-                if project_module_address == "" and is_api_deleted_for_project(api, project_name) {
-                    return false
-                }              
-            }
+        if details.type is "google_project_service" and details.change.actions contains "delete" and details.change.before.service == api {
+            count += 1
         }
-        
     }
-    return false
+    return count
+}
+
+# Ensure that the number of each required API being disabled is equal to or smaller than the number of projects being deleted
+func are_required_apis_disabled_for_all_projects() {
+    project_count = count_projects_being_deleted()
+    for required_apis as api {
+        if count_api_being_disabled(api) > project_count {
+            return false
+        }
+    }
+    return true
 }
 
 
-
-
-module_api_addr = rule {
-    !is_resource_changed() or is_module_address_equal_create() or is_module_address_equal_delete() or is_module_api_update_or_no_chg()
+is_api_amount_eq_proj_amount = rule {
+    (are_required_apis_enabled_for_all_projects() and are_required_apis_disabled_for_all_projects()) 
 }
-
 
 main = rule {
-    module_api_addr
+    is_api_amount_eq_proj_amount
 }
